@@ -1,5 +1,24 @@
 import logging, logging.config
 import copy
+import os, pathlib
+
+
+class MyStyle(object):
+    default_format = '%(message)s'
+    asctime_format = '%(asctime)s'
+
+    def __init__(self, fmt):
+        self._fmt = fmt or self.default_format
+
+    def usesTime(self):
+        return True
+
+    def format(self, record):
+        # Sometimes MyLogger will not be used. For example when Python itself
+        # raises an 'Task exception was never retrieved' error.
+        if not hasattr(record, "shortpath"):
+            record.shortpath = ".." + os.sep.join(pathlib.PurePath(record.pathname).parts[-2:])
+        return self._fmt % record.__dict__
 
 
 class MyFormatter(logging.Formatter):
@@ -35,6 +54,7 @@ class MyLogger(logging.Logger):
 
 
 def configure_logging():
+    logging._STYLES['p'] = (MyStyle, logging.BASIC_FORMAT)
     logging.setLoggerClass(MyLogger)
     LOGFILE_PATH = 'some_path'
     LOGGING = {
@@ -48,7 +68,8 @@ def configure_logging():
         'formatters': {
             'console': {
                 '()': MyFormatter,
-                'fmt': "%(levelname)s %(pathname)s:%(funcName)s:%(lineno)s %(message)s",
+                'fmt': "%(levelname)s %(shortpath)s:%(funcName)s:%(lineno)s %(message)s",
+                "style": "p",
             },
         },
         'handlers': {
@@ -68,3 +89,9 @@ def configure_logging():
         },
     }
     logging.config.dictConfig(LOGGING)
+
+
+if __name__ == "__main__":
+    configure_logging()
+    log = logging.getLogger(__name__)
+    log.info("Some error", extra={'d': 'abc'})
